@@ -1,3 +1,4 @@
 [submodule "edk2"]
 	path = edk2
 	url = https://github.com/inkatail/edk2.git
+	branch = my-no-vbe-shim
