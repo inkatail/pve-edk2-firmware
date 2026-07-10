@@ -2,6 +2,7 @@ pve-edk2-firmware (4.2025.05-2+csm1) trixie; urgency=medium
 
   * build the regular 4 MiB OVMF image with CSM support
   * use the inkatail/edk2 CSM restoration branch
+  * include and allowlist the CSM16 binary required by legacy boot
 
  -- inkatail <inkatail@users.noreply.github.com>  Fri, 10 Jul 2026 17:30:00 +0200
 

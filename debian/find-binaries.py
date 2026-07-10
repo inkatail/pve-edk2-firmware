@@ -46,7 +46,7 @@ if __name__ == '__main__':
     top = './'
 
     ignorelist = []
-    with open('./debian/binary-check.ignore', 'r') as f:
+    with open('./debian/binary-check.allow', 'r') as f:
         ignoreglobs = list(map(lambda s: s.strip(), f.readlines()))
     for pattern in ignoreglobs:
         matches = glob.glob(pattern, recursive=True, include_hidden=True)

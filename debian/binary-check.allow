@@ -310,6 +310,7 @@ EmulatorPkg/Win/VS2017/Win.vcxproj.user
 .git-blame-ignore-revs
 .github/codeql/edk2.qls
 .gitmodules
+OvmfPkg/Csm/Csm16/Csm16.bin
 IntelFsp2Pkg/Tools/Tests/ExpectedOutput.bsf
 **/*.json
 .mailmap
