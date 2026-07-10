@@ -5,7 +5,7 @@ SHELL=/bin/bash
 include /usr/share/dpkg/default.mk
 
 BUILD_TYPE ?= RELEASE
-EDK2_TOOLCHAIN = GCC5
+EDK2_TOOLCHAIN = GCC
 export $(EDK2_TOOLCHAIN)_AARCH64_PREFIX=aarch64-linux-gnu-
 export $(EDK2_TOOLCHAIN)_RISCV64_PREFIX=riscv64-linux-gnu-
 
