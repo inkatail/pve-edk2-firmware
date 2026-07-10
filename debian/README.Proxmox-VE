@@ -4,10 +4,10 @@ template images which are intended to be read-write, and therefore each
 guest should be given its own copy. Here's an overview of each of them:
 
 OVMF_CODE_4M.fd
-  Use this for booting guests in non-Secure Boot mode. While this image
-  technically supports Secure Boot, it does so without requiring SMM
-  support from QEMU, so it is less secure. Use the OVMF_VARS.fd template
-  with this.
+  Use this for booting guests in non-Secure Boot mode. This fork enables
+  the Compatibility Support Module (CSM) in this image for legacy BIOS
+  option ROMs and operating systems. CSM and Secure Boot are mutually
+  exclusive in this image. Use the OVMF_VARS.fd template with this.
 
 OVMF_CODE_4M.secboot.fd
   Like OVMF_CODE_4M.fd, but will abort if QEMU does not support SMM.
