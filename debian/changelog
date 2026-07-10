@@ -5,6 +5,7 @@ pve-edk2-firmware (4.2025.05-2+csm1) trixie; urgency=medium
   * include and allowlist the CSM16 binary required by legacy boot
   * use the current edk2 GCC toolchain tag (GCC5 was removed upstream)
   * follow the current ArmVirtQemu AArch64 output-directory spelling
+  * update edk2 with the QemuVideo VBE shim PCD declarations
 
  -- inkatail <inkatail@users.noreply.github.com>  Fri, 10 Jul 2026 17:30:00 +0200
 
