@@ -25,7 +25,6 @@ import tempfile
 class QemuEfiMachine(enum.Enum):
     OVMF_PC = enum.auto()
     OVMF_Q35 = enum.auto()
-    OVMF32 = enum.auto()
     AAVMF = enum.auto()
     AAVMF32 = enum.auto()
     RISCV64 = enum.auto()
@@ -73,9 +72,6 @@ class QemuCommand:
         QemuEfiMachine.OVMF_Q35: [
             'qemu-system-x86_64', '-machine', 'q35,accel=tcg',
         ] + Ovmf_Common_Params,
-        QemuEfiMachine.OVMF32: [
-            'qemu-system-i386', '-machine', 'q35,accel=tcg',
-        ] + Ovmf_Common_Params,
         QemuEfiMachine.RISCV64: [
             'qemu-system-riscv64',
         ] + RiscV_Common_Params,
@@ -106,17 +102,6 @@ class QemuCommand:
             return (
                 '/usr/share/AAVMF/AAVMF32_CODE.fd',
                 '/usr/share/AAVMF/AAVMF32_VARS.fd'
-            )
-        if machine == QemuEfiMachine.OVMF32:
-            assert(variant is None or variant in [QemuEfiVariant.SECBOOT])
-            assert(
-                flash_size in [
-                    QemuEfiFlashSize.DEFAULT, QemuEfiFlashSize.SIZE_4MB
-                ]
-            )
-            return (
-                '/usr/share/OVMF/OVMF32_CODE_4M.secboot.fd',
-                '/usr/share/OVMF/OVMF32_VARS_4M.fd',
             )
         # Remaining possibilities are OVMF variants
         if machine == QemuEfiMachine.OVMF_PC:

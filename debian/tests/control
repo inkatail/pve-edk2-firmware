@@ -7,7 +7,6 @@ Depends:
  mtools [amd64 arm64],
  openssl [amd64 arm64],
  ovmf,
- ovmf-ia32,
  python3-pexpect,
  qemu-efi-aarch64,
  qemu-efi-arm,
