@@ -1,4 +1,4 @@
 [submodule "edk2"]
 	path = edk2
 	url = https://github.com/inkatail/edk2.git
-	branch = restore-ovmf-csm
+	branch = csm-restore/ovmf-seabios

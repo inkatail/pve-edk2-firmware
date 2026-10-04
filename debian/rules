@@ -31,8 +31,15 @@ COMMON_FLAGS += -DNETWORK_TLS_ENABLE
 COMMON_FLAGS += -DSECURE_BOOT_ENABLE=TRUE
 COMMON_FLAGS += -DPVSCSI_ENABLE=TRUE
 COMMON_FLAGS += $(PCD_FLAGS)
+
+# shim releases before 15.8 use the EFI memory attributes protocol in a way
+# that breaks booting, so keep it uninstalled. A guest can opt back in with:
+#   -fw_cfg name=opt/org.tianocore/UninstallMemAttrProtocol,string=n
+NO_MEM_ATTR_FLAGS = --pcd PcdUninstallMemAttrProtocol=TRUE
+
 OVMF_COMMON_FLAGS  = $(COMMON_FLAGS)
 OVMF_COMMON_FLAGS += -DTPM2_ENABLE=TRUE
+OVMF_COMMON_FLAGS += $(NO_MEM_ATTR_FLAGS)
 OVMF_4M_FLAGS = $(OVMF_COMMON_FLAGS) -DFD_SIZE_4MB
 # Proxmox selects OVMF_CODE_4M.fd for non-Secure Boot VMs. Keep CSM out of
 # the SMM/Secure Boot, SEV, and TDX images.
@@ -40,11 +47,17 @@ OVMF_CSM_4M_FLAGS = $(filter-out -DSECURE_BOOT_ENABLE=TRUE,$(OVMF_4M_FLAGS)) -DC
 OVMF_4M_SMM_FLAGS = $(OVMF_4M_FLAGS) -DSMM_REQUIRE=TRUE
 OVMF_SEV_4M_FLAGS = $(OVMF_4M_FLAGS)
 OVMF_TDX_4M_FLAGS = $(OVMF_4M_FLAGS)
+# the microvm platform has neither SMM nor TPM support
+MICROVM_4M_FLAGS = $(COMMON_FLAGS) $(NO_MEM_ATTR_FLAGS) -DFD_SIZE_4MB
 
 AAVMF_FLAGS  = $(COMMON_FLAGS)
 AAVMF_FLAGS += -DTPM2_ENABLE=TRUE
 AAVMF_FLAGS += -DTPM2_CONFIG_ENABLE=TRUE
 AAVMF_FLAGS += -DCAVIUM_ERRATUM_27456=TRUE
+AAVMF_FLAGS += $(NO_MEM_ATTR_FLAGS)
+# GRUB versions still shipped by some distros need executable EfiLoaderData
+AAVMF_FLAGS += --pcd PcdDxeNxMemoryProtectionPolicy=0xC000000000007FD1
+AAVMF_SECBOOT_FLAGS = $(AAVMF_FLAGS) -DBUILD_SHELL=FALSE -DSECURE_BOOT_ENABLE=TRUE
 
 RISCV64_FLAGS = $(COMMON_FLAGS)
 
@@ -59,7 +72,7 @@ undefine CONF_PATH
 %:
 	dh $@
 
-override_dh_auto_build: build-qemu-efi-aarch64 build-ovmf build-ovmf-sev build-ovmf-tdx build-qemu-efi-riscv64
+override_dh_auto_build: build-qemu-efi-aarch64 build-ovmf build-ovmf-sev build-ovmf-tdx build-microvm build-qemu-efi-riscv64
 
 debian/setup-build-stamp:
 	cp -a debian/Logo.bmp MdeModulePkg/Logo/Logo.bmp
@@ -94,17 +107,24 @@ OVMF_TDX_BINARIES = $(OVMF_TDX_SHELL)
 OVMF_TDX_IMAGES  := $(addprefix $(OVMF_TDX_INSTALL_DIR)/,OVMF_TDX_4M.fd)
 OVMF_TDX_PREENROLLED_IMAGES := $(addprefix $(OVMF_TDX_INSTALL_DIR)/,OVMF_TDX_4M.ms.fd)
 
+MICROVM_INSTALL_DIR = debian/microvm-install
+MICROVM_BUILD_ROOT = Build/MicrovmX64
+MICROVM_BUILD_DIR = $(MICROVM_BUILD_ROOT)/$(BUILD_TYPE)_$(EDK2_TOOLCHAIN)
+MICROVM_SHELL = $(MICROVM_BUILD_DIR)/X64/Shell.efi
+MICROVM_BINARIES = $(MICROVM_SHELL)
+# the microvm platform only defines a combined flash image, there is no CODE/VARS split
+MICROVM_IMAGES := $(addprefix $(MICROVM_INSTALL_DIR)/,MICROVM_4M.fd)
+
 QEMU_EFI_BUILD_ROOT = Build/ArmVirtQemu-$(EDK2_ARCH_DIR)
 QEMU_EFI_BUILD_DIR = $(QEMU_EFI_BUILD_ROOT)/$(BUILD_TYPE)_$(EDK2_TOOLCHAIN)
+AAVMF_INSTALL_DIR = debian/aavmf-install
 AAVMF_BUILD_ROOT = Build/ArmVirtQemu-AArch64
 AAVMF_BUILD_DIR = $(AAVMF_BUILD_ROOT)/$(BUILD_TYPE)_$(EDK2_TOOLCHAIN)
 AAVMF_ENROLL    = $(AAVMF_BUILD_DIR)/AARCH64/EnrollDefaultKeys.efi
 AAVMF_SHELL     = $(AAVMF_BUILD_DIR)/AARCH64/Shell.efi
 AAVMF_BINARIES  = $(AAVMF_ENROLL) $(AAVMF_SHELL)
-AAVMF_CODE      = $(AAVMF_BUILD_DIR)/FV/AAVMF_CODE.fd
-AAVMF_VARS      = $(AAVMF_BUILD_DIR)/FV/AAVMF_VARS.fd
-AAVMF_IMAGES    = $(AAVMF_CODE) $(AAVMF_VARS)
-AAVMF_PREENROLLED_VARS = $(addprefix $(AAVMF_BUILD_DIR)/FV/,AAVMF_VARS.ms.fd AAVMF_VARS.snakeoil.fd)
+AAVMF_IMAGES    = $(addprefix $(AAVMF_INSTALL_DIR)/,AAVMF_CODE.fd AAVMF_CODE.secboot.fd AAVMF_VARS.fd)
+AAVMF_PREENROLLED_VARS = $(addprefix $(AAVMF_INSTALL_DIR)/,AAVMF_VARS.ms.fd AAVMF_VARS.snakeoil.fd)
 
 RISCV64_BUILD_ROOT = Build/RiscVVirtQemu
 RISCV64_BUILD_DIR = $(RISCV64_BUILD_ROOT)/$(BUILD_TYPE)_$(EDK2_TOOLCHAIN)
@@ -138,6 +158,18 @@ $(OVMF_TDX_BINARIES) $(OVMF_TDX_IMAGES): debian/setup-build-stamp
 			$(OVMF_TDX_4M_FLAGS) -b $(BUILD_TYPE)
 	cp $(OVMF_TDX_BUILD_DIR)/FV/OVMF.fd \
 		$(OVMF_TDX_INSTALL_DIR)/OVMF_TDX_4M.fd
+
+build-microvm: $(MICROVM_BINARIES) $(MICROVM_IMAGES)
+$(MICROVM_BINARIES) $(MICROVM_IMAGES): debian/setup-build-stamp
+	rm -rf $(MICROVM_INSTALL_DIR)
+	mkdir $(MICROVM_INSTALL_DIR)
+	set -e; . ./edksetup.sh; \
+		build -a X64 \
+			-t $(EDK2_TOOLCHAIN) \
+			-p OvmfPkg/Microvm/MicrovmX64.dsc \
+			$(MICROVM_4M_FLAGS) -b $(BUILD_TYPE)
+	cp $(MICROVM_BUILD_DIR)/FV/MICROVM.fd \
+		$(MICROVM_INSTALL_DIR)/MICROVM_4M.fd
 
 build-ovmf: $(OVMF_BINARIES) $(OVMF_IMAGES) $(OVMF_PREENROLLED_VARS)
 $(OVMF_BINARIES) $(OVMF_IMAGES): debian/setup-build-stamp
@@ -182,11 +214,11 @@ enroll_snakeoil = virt-fw-vars --input $(1) --output $(2) \
                     --add-db OvmfEnrollDefaultKeys \
                              debian/PkKek-1-snakeoil.pem
 
-%/AAVMF_VARS.ms.fd: %/AAVMF_CODE.fd %/AAVMF_VARS.fd debian/PkKek-1-vendor.pem $(AAVMF_ENROLL) $(AAVMF_SHELL)
-	$(call enroll_vendor,$(AAVMF_VARS),$@,arm64)
+%/AAVMF_VARS.ms.fd: %/AAVMF_CODE.secboot.fd %/AAVMF_VARS.fd debian/PkKek-1-vendor.pem $(AAVMF_ENROLL) $(AAVMF_SHELL)
+	$(call enroll_vendor,$(AAVMF_INSTALL_DIR)/AAVMF_VARS.fd,$@,arm64)
 
 %/AAVMF_VARS.snakeoil.fd: %/AAVMF_CODE.fd %/AAVMF_VARS.fd debian/PkKek-1-snakeoil.pem $(AAVMF_ENROLL) $(AAVMF_SHELL)
-	$(call enroll_snakeoil,$(AAVMF_VARS),$@)
+	$(call enroll_snakeoil,$(AAVMF_INSTALL_DIR)/AAVMF_VARS.fd,$@)
 
 %/OVMF_VARS.ms.fd: %/OVMF_CODE.secboot.fd %/OVMF_VARS.fd debian/PkKek-1-vendor.pem $(OVMF_ENROLL) $(OVMF_SHELL)
 	$(call enroll_vendor,$(OVMF_INSTALL_DIR)/OVMF_VARS.fd,$@,amd64)
@@ -203,27 +235,35 @@ enroll_snakeoil = virt-fw-vars --input $(1) --output $(2) \
 BaseTools/Bin/GccLto/liblto-aarch64.a:	BaseTools/Bin/GccLto/liblto-aarch64.s
 	$($(EDK2_TOOLCHAIN)_AARCH64_PREFIX)gcc -c -fpic $< -o $@
 
-BaseTools/Bin/GccLto/liblto-arm.a: BaseTools/Bin/GccLto/liblto-arm.s
-	$($(EDK2_TOOLCHAIN)_ARM_PREFIX)gcc -c -fpic $< -o $@
-
 build-qemu-efi: debian/setup-build-stamp
+	rm -rf $(QEMU_EFI_INSTALL_DIR)
+	mkdir $(QEMU_EFI_INSTALL_DIR)
 	set -e; . ./edksetup.sh; \
 		build -a $(EDK2_HOST_ARCH) \
 			-t $(EDK2_TOOLCHAIN) \
 			-p ArmVirtPkg/ArmVirtQemu.dsc \
 			$(AAVMF_FLAGS) -b $(BUILD_TYPE)
-	cp $(QEMU_EFI_BUILD_DIR)/FV/QEMU_EFI.fd \
-		$(QEMU_EFI_BUILD_DIR)/FV/$(FW_NAME)_CODE.fd
-	cp $(QEMU_EFI_BUILD_DIR)/FV/QEMU_VARS.fd \
-		$(QEMU_EFI_BUILD_DIR)/FV/$(FW_NAME)_VARS.fd
 	# QEMU expects 64MiB CODE and VARS files on ARM/AARCH64 architectures
 	# Truncate the firmware files to the expected size
-	truncate -s 64M $(QEMU_EFI_BUILD_DIR)/FV/$(FW_NAME)_CODE.fd
-	truncate -s 64M $(QEMU_EFI_BUILD_DIR)/FV/$(FW_NAME)_VARS.fd
+	truncate -s 64M $(QEMU_EFI_BUILD_DIR)/FV/QEMU_EFI.fd
+	truncate -s 64M $(QEMU_EFI_BUILD_DIR)/FV/QEMU_VARS.fd
+	cp $(QEMU_EFI_BUILD_DIR)/FV/QEMU_EFI.fd \
+		$(QEMU_EFI_INSTALL_DIR)/$(FW_NAME)_CODE.fd
+	cp $(QEMU_EFI_BUILD_DIR)/FV/QEMU_VARS.fd \
+		$(QEMU_EFI_INSTALL_DIR)/$(FW_NAME)_VARS.fd
+	rm -rf $(QEMU_EFI_BUILD_ROOT)
+	set -e; . ./edksetup.sh; \
+		build -a $(EDK2_HOST_ARCH) \
+			-t $(EDK2_TOOLCHAIN) \
+			-p ArmVirtPkg/ArmVirtQemu.dsc \
+			$(AAVMF_SECBOOT_FLAGS) -b $(BUILD_TYPE)
+	truncate -s 64M $(QEMU_EFI_BUILD_DIR)/FV/QEMU_EFI.fd
+	cp $(QEMU_EFI_BUILD_DIR)/FV/QEMU_EFI.fd \
+		$(QEMU_EFI_INSTALL_DIR)/$(FW_NAME)_CODE.secboot.fd
 
 build-qemu-efi-aarch64: $(AAVMF_BINARIES) $(AAVMF_IMAGES) $(AAVMF_PREENROLLED_VARS)
 $(AAVMF_BINARIES) $(AAVMF_IMAGES): BaseTools/Bin/GccLto/liblto-aarch64.a
-	$(MAKE) -f debian/rules build-qemu-efi EDK2_ARCH_DIR=AArch64 EDK2_HOST_ARCH=AARCH64 FW_NAME=AAVMF
+	$(MAKE) -f debian/rules build-qemu-efi EDK2_ARCH_DIR=AArch64 EDK2_HOST_ARCH=AARCH64 FW_NAME=AAVMF QEMU_EFI_INSTALL_DIR=$(AAVMF_INSTALL_DIR)
 
 build-qemu-efi-riscv64:  $(RISCV64_IMAGES)
 $(RISCV64_IMAGES): debian/setup-build-stamp
@@ -284,4 +324,4 @@ update-dbx:
 	sed -i -e '/DBXUpdate-/d' debian/source/include-binaries
 	ls debian/DBXUpdate-*.bin >> debian/source/include-binaries
 
-.PHONY: build-ovmf build-ovmf-sev build-ovmf-tdx build-qemu-efi build-qemu-efi-aarch64 build-qemu-efi-riscv64 update-dbx
+.PHONY: build-ovmf build-ovmf-sev build-ovmf-tdx build-microvm build-qemu-efi build-qemu-efi-aarch64 build-qemu-efi-riscv64 update-dbx

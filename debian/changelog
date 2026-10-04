@@ -1,15 +1,38 @@
-pve-edk2-firmware (4.2025.05-2+csm1) trixie; urgency=medium
+pve-edk2-firmware (4.2026.08-1+csm1) trixie; urgency=medium
 
   * build the regular 4 MiB OVMF image with CSM support
-  * use the inkatail/edk2 CSM restoration branch
-  * include and allowlist the CSM16 binary required by legacy boot
+  * use the inkatail/edk2 CSM restoration branch (csm-restore/ovmf-seabios)
   * use the current edk2 GCC toolchain tag (GCC5 was removed upstream)
-  * follow the current ArmVirtQemu AArch64 output-directory spelling
-  * update edk2 with the QemuVideo VBE shim PCD declarations
-  * stop building standalone OVMF32, which current edk2 removed
-  * install AArch64 firmware from the current output directory
 
- -- inkatail <inkatail@users.noreply.github.com>  Fri, 10 Jul 2026 17:30:00 +0200
+ -- inkatail <inkatail@users.noreply.github.com>  Sun, 04 Oct 2026 18:30:00 +0200
+
+pve-edk2-firmware (4.2026.08-1) trixie; urgency=medium
+
+  * update edk2 to edk2-stable202608 release and refresh patches. Besides many
+    bug and security fixes, the changes most relevant for guests are:
+    - the Secure Boot image now provides the Windows SMM Security Mitigation
+      Table (WSMT). Windows needs this table to report virtualization-based
+      security features like HVCI and Credential Guard as available.
+    - fix CVE-2024-13745: a guest with a vTPM could get a different partition
+      table measured into PCR 5 than the one it actually booted from.
+    - enrolling a Secure Boot platform key that is not self-signed no longer
+      requires switching the firmware to custom mode first.
+
+  * drop the 32-bit only OVMF images, upstream removed the OvmfPkgIa32
+    platform and Proxmox VE never referenced them.
+
+  * disable the EFI memory attributes protocol through the upstream build-time
+    knob instead of patching out its producers. Guests that want the protocol
+    can now request it with the QEMU option
+    '-fw_cfg name=opt/org.tianocore/UninstallMemAttrProtocol,string=n'.
+
+ -- Proxmox Support Team <support@proxmox.com>  Wed, 26 Aug 2026 16:20:39 +0200
+
+pve-edk2-firmware (4.2025.05-3) trixie; urgency=medium
+
+  * build secureboot-enabled image for aarch64.
+
+ -- Proxmox Support Team <support@proxmox.com>  Mon, 03 Aug 2026 22:56:07 +0200
 
 pve-edk2-firmware (4.2025.05-2) trixie; urgency=medium
 

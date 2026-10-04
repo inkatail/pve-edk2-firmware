@@ -1,3 +1,4 @@
+brotlicompress-disable.diff
 x64-baseline-abi.patch
-Revert-ArmVirtPkg-make-EFI_LOADER_DATA-non-executabl.patch
-ArmVirtPkg-disable-the-EFI_MEMORY_ATTRIBUTE-protocol.patch
+OvmfPkg-X64-add-opt-org.tianocore-UninstallMemAttrPr.patch
+Enable_SCSI_IntelTdx_DXEFV.patch
